@@ -1,6 +1,7 @@
 package channel
 
 import (
+	"context"
 	"fmt"
 	"math/rand"
 	"runtime"
@@ -75,6 +76,24 @@ func TestChannel_Close(t *testing.T) {
 	stats = customerChannel.Stats()
 	assert.Equal(t, 0, stats.Subscribers)
 	assert.Equal(t, 0, stats.Sessions)
+}
+
+func TestChannel_Listen(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	customerChannel := New()
+	var flagc int32
+	err := customerChannel.Listen(ctx, "mmadfox", func(b []byte) {
+		assert.Equal(t, "mmadfox", string(b))
+		atomic.AddInt32(&flagc, 1)
+	}, func() {
+		atomic.AddInt32(&flagc, 1)
+	})
+	assert.Nil(t, err)
+	assert.Nil(t, customerChannel.Publish([]byte("mmadfox")))
+	<-time.After(time.Second)
+	cancel()
+	<-time.After(time.Second)
+	assert.Equal(t, int32(2), atomic.LoadInt32(&flagc))
 }
 
 func TestChannel_Subscribe(t *testing.T) {

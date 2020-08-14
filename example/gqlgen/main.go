@@ -35,11 +35,33 @@ func gqlgenSubscriptionAPI(ctx context.Context, s *Subscriptions) {
 		}
 	}()
 	go func() {
+		ch, _ := s.SubscribeToCustomerChanged(ctx, &GQLModelInput{UserID: "mmadfox2"})
+		for {
+			select {
+			case m := <-ch:
+				log.Println("Customer2", m)
+			case <-ctx.Done():
+				return
+			}
+		}
+	}()
+	go func() {
 		ch, _ := s.SubscribeToOrderChanged(ctx, &GQLModelInput{UserID: "mmadfox"})
 		for {
 			select {
 			case m := <-ch:
 				log.Println("Order", m)
+			case <-ctx.Done():
+				return
+			}
+		}
+	}()
+	go func() {
+		ch, _ := s.SubscribeToOrderChanged(ctx, &GQLModelInput{UserID: "mmadfox2"})
+		for {
+			select {
+			case m := <-ch:
+				log.Println("Order2", m)
 			case <-ctx.Done():
 				return
 			}
@@ -96,56 +118,34 @@ func (s *Subscriptions) PublishCustomerChangedFromKafka(ctx context.Context, pay
 }
 
 func (s *Subscriptions) SubscribeToOrderChanged(ctx context.Context, input *GQLModelInput) (<-chan *Order, error) {
-	subscription, err := s.orderChanged.Subscribe(input.UserID)
-	if err != nil {
+	out := make(chan *Order)
+	if err := s.orderChanged.Listen(ctx, input.UserID, func(msg []byte) {
+		var o Order
+		if err := json.Unmarshal(msg, &o); err != nil {
+			// logging here
+		}
+		out <- &o
+	}, func() {
+		close(out)
+	}); err != nil {
 		return nil, err
 	}
-	out := make(chan *Order)
-	go func() {
-		for {
-			select {
-			case payload := <-subscription.Channel():
-				var o Order
-				// OR protobuf, avro, etc
-				if err := json.Unmarshal(payload, &o); err != nil {
-					// logging here
-				}
-
-				out <- &o
-			case <-ctx.Done():
-				_ = s.orderChanged.Unsubscribe(subscription)
-				close(out)
-				return
-			}
-		}
-	}()
 	return out, nil
 }
 
 func (s *Subscriptions) SubscribeToCustomerChanged(ctx context.Context, input *GQLModelInput) (<-chan *Customer, error) {
-	subscription, err := s.customerChanged.Subscribe(input.UserID)
-	if err != nil {
+	out := make(chan *Customer)
+	if err := s.customerChanged.Listen(ctx, input.UserID, func(msg []byte) {
+		var o Customer
+		if err := json.Unmarshal(msg, &o); err != nil {
+			// logging here
+		}
+		out <- &o
+	}, func() {
+		close(out)
+	}); err != nil {
 		return nil, err
 	}
-	out := make(chan *Customer)
-	go func() {
-		for {
-			select {
-			case payload := <-subscription.Channel():
-				var o Customer
-				// OR protobuf, avro, etc
-				if err := json.Unmarshal(payload, &o); err != nil {
-					// logging
-				}
-
-				out <- &o
-			case <-ctx.Done():
-				_ = s.customerChanged.Unsubscribe(subscription)
-				close(out)
-				return
-			}
-		}
-	}()
 	return out, nil
 }
 

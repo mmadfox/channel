@@ -1,6 +1,7 @@
 package channel
 
 import (
+	"context"
 	"errors"
 	"runtime"
 )
@@ -44,6 +45,27 @@ func (c *Channel) Publish(message []byte) error {
 	for _, bucket := range c.buckets {
 		bucket.queue <- message
 	}
+	return nil
+}
+
+func (c *Channel) Listen(ctx context.Context, subscriber string,
+	handle func(b []byte), cleanup func()) error {
+	subscription, err := c.Subscribe(subscriber)
+	if err != nil {
+		return err
+	}
+	go func() {
+		for {
+			select {
+			case payload := <-subscription.Channel():
+				handle(payload)
+			case <-ctx.Done():
+				_ = c.Unsubscribe(subscription)
+				cleanup()
+				return
+			}
+		}
+	}()
 	return nil
 }
 
