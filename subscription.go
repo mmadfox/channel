@@ -48,6 +48,17 @@ func (s Subscription) IsClosed() bool {
 	}
 }
 
+func (s *Subscription) publish(b []byte, ignore bool) {
+	if ignore {
+		select {
+		case s.channel <- b:
+		default:
+		}
+	} else {
+		s.channel <- b
+	}
+}
+
 func (s Subscription) String() string {
 	return "Subscription{sid:" + s.session + ", subscriber:" + s.subscriber + "}"
 }

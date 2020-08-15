@@ -82,14 +82,7 @@ func (b *bucket) publishTo(subscriber string, payload []byte) error {
 		return ErrSubscriberNotFound
 	}
 	for _, subscription := range subscriptions {
-		if b.ignoreSlowClients {
-			select {
-			case subscription.channel <- payload:
-			default:
-			}
-		} else {
-			subscription.channel <- payload
-		}
+		subscription.publish(payload, b.ignoreSlowClients)
 	}
 	return nil
 }
@@ -97,16 +90,9 @@ func (b *bucket) publishTo(subscriber string, payload []byte) error {
 func (b *bucket) publish(payload []byte) {
 	b.RLock()
 	defer b.RUnlock()
-	for _, sessions := range b.subscribers {
-		for _, session := range sessions {
-			if b.ignoreSlowClients {
-				select {
-				case session.channel <- payload:
-				default:
-				}
-			} else {
-				session.channel <- payload
-			}
+	for _, subscriptions := range b.subscribers {
+		for _, subscription := range subscriptions {
+			subscription.publish(payload, b.ignoreSlowClients)
 		}
 	}
 }
