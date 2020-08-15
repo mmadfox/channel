@@ -4,7 +4,7 @@ type Option func(c *bucketOptions)
 
 const (
 	DefaultMaxLimitSessions = 10
-	DefaultBufSize          = 10
+	DefaultBufSize          = 1
 )
 
 func MaxLimitSessions(limit int) Option {

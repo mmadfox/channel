@@ -137,7 +137,7 @@ func TestChannel_SubscribeConcurrency(t *testing.T) {
 }
 
 func TestChannel_PublishToSubscribers(t *testing.T) {
-	customerChannel := New(IgnoreSlowClients())
+	customerChannel := New()
 	subscribers := 10
 	stats := make(map[string]int)
 	var mu sync.RWMutex
@@ -171,7 +171,7 @@ func TestChannel_PublishToSubscribers(t *testing.T) {
 }
 
 func TestChannel_PublishToSubscriber(t *testing.T) {
-	customerChannel := New(IgnoreSlowClients())
+	customerChannel := New()
 	subscribers := 10
 	stats := make(map[string]int)
 	var mu sync.RWMutex
@@ -233,11 +233,22 @@ func TestChannel_Unsubscribe(t *testing.T) {
 	assert.Equal(t, 0, stats.Sessions)
 }
 
+func TestChannel_IgnoreSlowClients(t *testing.T) {
+	customerChannel := New(IgnoreSlowClients())
+	subscription, err := customerChannel.Subscribe("user")
+	assert.Nil(t, err)
+	go func() {
+		<-subscription.Channel()
+	}()
+	for i := 0; i < 10; i++ {
+		assert.Nil(t, customerChannel.PublishToAllSubscribers([]byte("MSG")))
+	}
+}
+
 func BenchmarkChannel_Publish(b *testing.B) {
-	customerChannel := New()
-	max := 1000
-	finished := make(chan struct{}, max)
-	for i := 0; i < max; i++ {
+	customerChannel := New(IgnoreSlowClients())
+	finished := make(chan struct{}, b.N)
+	for i := 0; i < b.N; i++ {
 		n := fmt.Sprintf("n%d", i)
 		s, err := customerChannel.Subscribe(n)
 		if err != nil {
@@ -252,7 +263,7 @@ func BenchmarkChannel_Publish(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		_ = customerChannel.PublishToAllSubscribers([]byte("MSG"))
 	}
-	for i := 0; i < max; i++ {
+	for i := 0; i < b.N; i++ {
 		<-finished
 	}
 }
