@@ -123,17 +123,46 @@ func TestChannel_Subscribe(t *testing.T) {
 }
 
 func TestChannel_SubscribeConcurrency(t *testing.T) {
-	customerChannel := New()
-	subscribers := 10
+	customerChannel := New(
+		SubscriptionBufSize(1),
+	)
+	var counter int32
+	subscribers := 1000
+	pc := 50
+	ctx, cancel := context.WithCancel(context.Background())
+
 	for i := 0; i < subscribers; i++ {
 		userName := fmt.Sprintf("user-%d", i)
-		t.Run(userName, func(t *testing.T) {
-			t.Parallel()
-			subscription, err := customerChannel.Subscribe(userName)
-			assert.Nil(t, err)
-			assert.NotEmpty(t, subscription.Session())
-		})
+		subscription, err := customerChannel.Subscribe(userName)
+		assert.Nil(t, err)
+		go func(s Subscription) {
+			for {
+				select {
+				case <-s.Channel():
+					atomic.AddInt32(&counter, 1)
+				case <-ctx.Done():
+					return
+				}
+			}
+		}(subscription)
 	}
+
+	var wg sync.WaitGroup
+	for x := 0; x < 10; x++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for w := 0; w < pc; w++ {
+				assert.Nil(t, customerChannel.PublishToAllSubscribers([]byte("MSG")))
+			}
+		}()
+	}
+
+	wg.Wait()
+	time.Sleep(100 * time.Millisecond)
+	cancel()
+
+	assert.Equal(t, int32(subscribers*pc*10), atomic.LoadInt32(&counter))
 }
 
 func TestChannel_PublishToSubscribers(t *testing.T) {

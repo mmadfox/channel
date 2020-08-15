@@ -48,14 +48,14 @@ func (s Subscription) IsClosed() bool {
 	}
 }
 
-func (s *Subscription) publish(b []byte, ignore bool) {
-	if ignore {
+func (s *Subscription) Publish(payload []byte, async bool) {
+	if async {
 		select {
-		case s.channel <- b:
+		case s.channel <- payload:
 		default:
 		}
 	} else {
-		s.channel <- b
+		s.channel <- payload
 	}
 }
 

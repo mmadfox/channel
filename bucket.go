@@ -82,7 +82,7 @@ func (b *bucket) publishTo(subscriber string, payload []byte) error {
 		return ErrSubscriberNotFound
 	}
 	for _, subscription := range subscriptions {
-		subscription.publish(payload, b.ignoreSlowClients)
+		subscription.Publish(payload, b.ignoreSlowClients)
 	}
 	return nil
 }
@@ -92,7 +92,7 @@ func (b *bucket) publish(payload []byte) {
 	defer b.RUnlock()
 	for _, subscriptions := range b.subscribers {
 		for _, subscription := range subscriptions {
-			subscription.publish(payload, b.ignoreSlowClients)
+			subscription.Publish(payload, b.ignoreSlowClients)
 		}
 	}
 }

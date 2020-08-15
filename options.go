@@ -7,6 +7,7 @@ const (
 	DefaultBufSize          = 1
 )
 
+// MaxLimitSessions maximum session limit for one subscriber.
 func MaxLimitSessions(limit int) Option {
 	return func(c *bucketOptions) {
 		if limit <= 0 {
@@ -16,12 +17,14 @@ func MaxLimitSessions(limit int) Option {
 	}
 }
 
+// IgnoreSlowClients non-blocking message sending.
 func IgnoreSlowClients() Option {
 	return func(c *bucketOptions) {
 		c.ignoreSlowClients = true
 	}
 }
 
+// SubscriptionBufSize subscriptions buffered channel size.
 func SubscriptionBufSize(size int) Option {
 	return func(c *bucketOptions) {
 		if size < 0 {
