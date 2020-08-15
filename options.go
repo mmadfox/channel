@@ -7,7 +7,7 @@ const (
 	DefaultBufSize          = 1
 )
 
-// MaxLimitSessions maximum session limit for one subscriber.
+// MaxLimitSessions maximum sessions per subscriber.
 func MaxLimitSessions(limit int) Option {
 	return func(c *bucketOptions) {
 		if limit <= 0 {

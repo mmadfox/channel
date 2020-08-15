@@ -58,7 +58,7 @@ func (s *Subscriptions) GpsLocationChanged(ctx context.Context, input *models.GP
 
 #### Options
 ```go
-// maximum session limit for one subscriber.
+// maximum sessions per subscriber.
 MaxLimitSessions(limit int) Option 
 // non-blocking message sending.
 IgnoreSlowClients() Option
