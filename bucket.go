@@ -100,7 +100,6 @@ func (b *bucket) publish(payload []byte) {
 func (b *bucket) close() {
 	b.Lock()
 	defer b.Unlock()
-	close(b.done)
 	for sid, subscriptions := range b.subscribers {
 		for _, subscription := range subscriptions {
 			if !subscription.IsClosed() {
@@ -111,6 +110,7 @@ func (b *bucket) close() {
 		delete(b.subscribers, sid)
 	}
 	b.subscribersCount = len(b.subscribers)
+	close(b.done)
 }
 
 func (b *bucket) subscribe(subscriber string) (Subscription, error) {
