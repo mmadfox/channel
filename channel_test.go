@@ -161,3 +161,27 @@ func TestChannel_Unsubscribe(t *testing.T) {
 	assert.Equal(t, 0, stats.Subscribers)
 	assert.Equal(t, 0, stats.Sessions)
 }
+
+func BenchmarkChannel_Publish(b *testing.B) {
+	customerChannel := New()
+	max := 1000
+	finished := make(chan struct{}, max)
+	for i := 0; i < max; i++ {
+		n := fmt.Sprintf("n%d", i)
+		s, err := customerChannel.Subscribe(n)
+		if err != nil {
+			b.Fail()
+		}
+		go func(s Subscription) {
+			<-s.Channel()
+			finished <- struct{}{}
+		}(s)
+	}
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		customerChannel.Publish([]byte("MSG"))
+	}
+	for i := 0; i < max; i++ {
+		<-finished
+	}
+}
