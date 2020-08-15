@@ -4,24 +4,34 @@ import (
 	"sync"
 )
 
+type bucketOptions struct {
+	maxLimitSessions  int
+	ignoreSlowClients bool
+	bufSize           int
+}
+
 type bucket struct {
 	sync.RWMutex
-	subscribers      map[string][]Subscription
-	queue            chan []byte
-	done             chan struct{}
-	sessionCount     int
-	subscribersCount int
-	maxLimitSessions int
+	subscribers       map[string][]Subscription
+	queue             chan []byte
+	done              chan struct{}
+	sessionCount      int
+	subscribersCount  int
+	maxLimitSessions  int
+	ignoreSlowClients bool
+	bufSize           int
 }
 
 func newBucket(
-	maxLimitSessions int,
+	opt *bucketOptions,
 ) *bucket {
 	b := &bucket{
-		maxLimitSessions: maxLimitSessions,
-		subscribers:      make(map[string][]Subscription),
-		queue:            make(chan []byte, 1),
-		done:             make(chan struct{}),
+		maxLimitSessions:  opt.maxLimitSessions,
+		subscribers:       make(map[string][]Subscription),
+		queue:             make(chan []byte, 1),
+		done:              make(chan struct{}),
+		ignoreSlowClients: opt.ignoreSlowClients,
+		bufSize:           opt.bufSize,
 	}
 	go b.listen()
 	return b
@@ -64,12 +74,38 @@ func (b *bucket) unsubscribe(subscriber string, session string) error {
 	return nil
 }
 
+func (b *bucket) publishTo(subscriber string, payload []byte) error {
+	b.RLock()
+	defer b.RUnlock()
+	subscriptions, found := b.subscribers[subscriber]
+	if !found {
+		return ErrSubscriberNotFound
+	}
+	for _, subscription := range subscriptions {
+		if b.ignoreSlowClients {
+			select {
+			case subscription.channel <- payload:
+			default:
+			}
+		} else {
+			subscription.channel <- payload
+		}
+	}
+	return nil
+}
+
 func (b *bucket) publish(payload []byte) {
+	b.RLock()
+	defer b.RUnlock()
 	for _, sessions := range b.subscribers {
 		for _, session := range sessions {
-			select {
-			case session.channel <- payload:
-			default:
+			if b.ignoreSlowClients {
+				select {
+				case session.channel <- payload:
+				default:
+				}
+			} else {
+				session.channel <- payload
 			}
 		}
 	}
@@ -96,12 +132,12 @@ func (b *bucket) subscribe(subscriber string) (Subscription, error) {
 	defer b.Unlock()
 	subscriptions, found := b.subscribers[subscriber]
 	if !found {
-		subscriptions = make([]Subscription, 0, 3)
+		subscriptions = make([]Subscription, 0, 1)
 	}
 	if len(subscriptions) >= b.maxLimitSessions {
 		return Subscription{}, ErrTooManySessions
 	}
-	s := MakeSubscription(subscriber)
+	s := MakeSubscription(subscriber, b.bufSize)
 	subscriptions = append(subscriptions, s)
 	b.subscribers[subscriber] = subscriptions
 	b.subscribersCount = len(b.subscribers)

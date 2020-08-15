@@ -7,7 +7,7 @@ import (
 )
 
 func TestMakeSubscription(t *testing.T) {
-	s := MakeSubscription("subs")
+	s := MakeSubscription("subs", 1)
 	assert.Equal(t, "subs", s.Subscriber())
 	assert.NotEmpty(t, s.Session())
 	assert.True(t, s.Equal(s.Session()))

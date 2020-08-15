@@ -1,0 +1,21 @@
+package grpah
+
+type Resolver struct {
+	subscriptionResolver generated.SubscriptionResolver
+	// ...
+}
+
+func NewResolver(
+	subscription *Subscription,
+) *Resolver {
+	return &Resolver{
+		subscriptionResolver: subscription,
+		// ...
+	}
+}
+
+// ...
+
+func (r *Resolver) Subscription() generated.SubscriptionResolver {
+	return r.subscriptionResolver
+}

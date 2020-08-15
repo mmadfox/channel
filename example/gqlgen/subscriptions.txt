@@ -1,0 +1,47 @@
+package graph
+
+import (
+	"context"
+	"encoding/json"
+
+	"github.com/go-kit/kit/log"
+
+	"github.com/kidscontrol/api/internal/graph/models"
+	"github.com/mmadfox/channel"
+)
+
+type Subscription struct {
+	logger             log.Logger
+	gpsLocationChanged *channel.Channel
+}
+
+func NewSubscription(logger log.Logger) *Subscription {
+	return &Subscription{
+		logger:             logger,
+		gpsLocationChanged: channel.New(channel.MaxLimitSessions(1)),
+	}
+}
+
+func (s *Subscription) Close() {
+	_ = s.gpsLocationChanged.Close()
+}
+
+func (s *Subscription) GpsLocationChanged(ctx context.Context, input *models.GPSLocationChangedInput) (
+	<-chan *models.GPSLocation, error) {
+	out := make(chan *models.GPSLocation)
+	if err := s.gpsLocationChanged.Listen(ctx, input.UserID, func(b []byte) {
+		var m models.GPSLocation
+		if err := json.Unmarshal(b, &m); err != nil {
+			_ = s.logger.Log("channel", "gpsLocationChanged",
+				"subscriber", input.UserID, "err", err)
+		}
+		out <- &m
+	}, func() {
+		close(out)
+	}); err != nil {
+		_ = s.logger.Log("channel", "gpsLocationChanged",
+			"subscriber", input.UserID, "err", err)
+		return nil, err
+	}
+	return out, nil
+}

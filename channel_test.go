@@ -89,7 +89,7 @@ func TestChannel_Listen(t *testing.T) {
 		atomic.AddInt32(&flagc, 1)
 	})
 	assert.Nil(t, err)
-	assert.Nil(t, customerChannel.Publish([]byte("mmadfox")))
+	assert.Nil(t, customerChannel.PublishToAllSubscribers([]byte("mmadfox")))
 	<-time.After(time.Second)
 	cancel()
 	<-time.After(time.Second)
@@ -116,7 +116,7 @@ func TestChannel_Subscribe(t *testing.T) {
 	stats := customerChannel.Stats()
 	assert.Equal(t, subscribers, stats.Subscribers)
 	assert.Equal(t, subscribers, stats.Sessions)
-	err := customerChannel.Publish([]byte("MSG"))
+	err := customerChannel.PublishToAllSubscribers([]byte("MSG"))
 	assert.Nil(t, err)
 	wg.Wait()
 	assert.Equal(t, atomic.LoadInt32(&counter), int32(subscribers))
@@ -133,6 +133,77 @@ func TestChannel_SubscribeConcurrency(t *testing.T) {
 			assert.Nil(t, err)
 			assert.NotEmpty(t, subscription.Session())
 		})
+	}
+}
+
+func TestChannel_PublishToSubscribers(t *testing.T) {
+	customerChannel := New(IgnoreSlowClients())
+	subscribers := 10
+	stats := make(map[string]int)
+	var mu sync.RWMutex
+	var step sync.WaitGroup
+	for i := 0; i < subscribers; i++ {
+		subscriberID := fmt.Sprintf("sub-%d", i)
+		subscription, err := customerChannel.Subscribe(subscriberID)
+		assert.Nil(t, err)
+		stats[subscription.Subscriber()] = 0
+		step.Add(1)
+		go func(s Subscription) {
+			step.Done()
+			for {
+				<-s.Channel()
+				mu.Lock()
+				stats[s.Subscriber()]++
+				mu.Unlock()
+			}
+		}(subscription)
+	}
+	step.Wait()
+	assert.Nil(t, customerChannel.PublishToSubscribers([]string{"sub-0", "sub-1", "_bad_"}, []byte("MSG")))
+	time.Sleep(10 * time.Millisecond)
+	for sid, cnt := range stats {
+		if sid == "sub-0" || sid == "sub-1" {
+			assert.Equal(t, 1, cnt)
+		} else {
+			assert.Equal(t, 0, cnt)
+		}
+	}
+}
+
+func TestChannel_PublishToSubscriber(t *testing.T) {
+	customerChannel := New(IgnoreSlowClients())
+	subscribers := 10
+	stats := make(map[string]int)
+	var mu sync.RWMutex
+	var step sync.WaitGroup
+	for i := 0; i < subscribers; i++ {
+		subscriberID := fmt.Sprintf("sub-%d", i)
+		subscription, err := customerChannel.Subscribe(subscriberID)
+		assert.Nil(t, err)
+		stats[subscription.Subscriber()] = 0
+		step.Add(1)
+		go func(s Subscription) {
+			step.Done()
+			for {
+				<-s.Channel()
+				mu.Lock()
+				stats[s.Subscriber()]++
+				mu.Unlock()
+			}
+		}(subscription)
+	}
+	step.Wait()
+	assert.Nil(t, customerChannel.PublishToSubscriber("sub-0", []byte("MSG")))
+	assert.Nil(t, customerChannel.PublishToSubscriber("sub-0", []byte("MSG")))
+	assert.Nil(t, customerChannel.PublishToSubscriber("sub-0", []byte("MSG")))
+	assert.Nil(t, customerChannel.PublishToSubscriber("sub-0", []byte("MSG")))
+	time.Sleep(10 * time.Millisecond)
+	for sid, cnt := range stats {
+		if sid == "sub-0" {
+			assert.Equal(t, 4, cnt)
+		} else {
+			assert.Equal(t, 0, cnt)
+		}
 	}
 }
 
@@ -179,7 +250,7 @@ func BenchmarkChannel_Publish(b *testing.B) {
 	}
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		customerChannel.Publish([]byte("MSG"))
+		_ = customerChannel.PublishToAllSubscribers([]byte("MSG"))
 	}
 	for i := 0; i < max; i++ {
 		<-finished

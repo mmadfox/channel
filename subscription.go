@@ -8,10 +8,10 @@ type Subscription struct {
 	session    string
 }
 
-func MakeSubscription(subscriber string) Subscription {
+func MakeSubscription(subscriber string, chBufSize int) Subscription {
 	return Subscription{
 		session:    uuid.New().String(),
-		channel:    make(chan []byte, 1),
+		channel:    make(chan []byte, chBufSize),
 		subscriber: subscriber,
 	}
 }
@@ -46,6 +46,10 @@ func (s Subscription) IsClosed() bool {
 	default:
 		return false
 	}
+}
+
+func (s Subscription) String() string {
+	return "Subscription{sid:" + s.session + ", subscriber:" + s.subscriber + "}"
 }
 
 type Stats struct {

@@ -10,28 +10,33 @@ var (
 	ErrInitBucket           = errors.New("channel: unable to initialize buckets")
 	ErrSubscriptionNotFound = errors.New("channel: subscription not found")
 	ErrTooManySessions      = errors.New("channel: too many sessions")
+	ErrSubscriberNotFound   = errors.New("channel: subscriber not found")
 )
 
 func New(options ...Option) *Channel {
 	numCPU := runtime.NumCPU()
 	channel := Channel{
-		bucketSize:       numCPU,
-		buckets:          make([]*bucket, numCPU),
-		maxLimitSessions: DefaultMaxLimitSessions,
+		bucketSize: numCPU,
+		buckets:    make([]*bucket, numCPU),
+		bucketOpts: &bucketOptions{
+			maxLimitSessions:  DefaultMaxLimitSessions,
+			ignoreSlowClients: false,
+			bufSize:           DefaultBufSize,
+		},
 	}
 	for _, opt := range options {
-		opt(&channel)
+		opt(channel.bucketOpts)
 	}
 	for i := 0; i < numCPU; i++ {
-		channel.buckets[i] = newBucket(channel.maxLimitSessions)
+		channel.buckets[i] = newBucket(channel.bucketOpts)
 	}
 	return &channel
 }
 
 type Channel struct {
-	bucketSize       int
-	buckets          []*bucket
-	maxLimitSessions int
+	bucketSize int
+	buckets    []*bucket
+	bucketOpts *bucketOptions
 }
 
 func (c *Channel) Close() error {
@@ -41,7 +46,32 @@ func (c *Channel) Close() error {
 	return nil
 }
 
-func (c *Channel) Publish(message []byte) error {
+func (c *Channel) PublishToSubscriber(subscriber string, message []byte) error {
+	bucket, err := c.bucket(subscriber)
+	if err != nil {
+		return err
+	}
+	return bucket.publishTo(subscriber, message)
+}
+
+func (c *Channel) PublishToSubscribers(subscribers []string, message []byte) error {
+	for _, subscriber := range subscribers {
+		bucket, err := c.bucket(subscriber)
+		if err != nil {
+			return err
+		}
+		err = bucket.publishTo(subscriber, message)
+		if err != nil {
+			if errors.Is(err, ErrSubscriberNotFound) {
+				continue
+			}
+			return err
+		}
+	}
+	return nil
+}
+
+func (c *Channel) PublishToAllSubscribers(message []byte) error {
 	for _, bucket := range c.buckets {
 		bucket.queue <- message
 	}
