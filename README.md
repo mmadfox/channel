@@ -1,4 +1,8 @@
-# channel
+# channel [![Coverage Status](https://coveralls.io/repos/github/mmadfox/channel/badge.svg?branch=master&2)](https://coveralls.io/github/mmadfox/channel?branch=master&1) [![Go Report Card](https://goreportcard.com/badge/mediabuyerbot/go-wirenet)](https://goreportcard.com/report/mmadfox/channel) [![Go Documentation](http://img.shields.io/badge/go-documentation-blue.svg?style=flat-square)][godocs]
+
+[godocs]: https://godoc.org/github.com/mmadfox/channel 
+
+
 Channels for subscriptions. Used in GQLgen API to forward messages from kafka broker to websocket clients.
 
 ### Example
