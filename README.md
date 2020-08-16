@@ -1,5 +1,5 @@
 # channel
-gqlgen channels for subscriptions
+Channels for subscriptions. Used in GQLgen API to forward messages from kafka broker to websocket clients.
 
 ### Example
 #### Publish / Subscribe
