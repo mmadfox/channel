@@ -35,16 +35,16 @@ func TestChannel_OneSubscriberManySessions(t *testing.T) {
 	s3, err := customerChannel.Subscribe("qwerty")
 	assert.Nil(t, err)
 	stats := customerChannel.Stats()
-	assert.Equal(t, 1, stats.Subscribers)
-	assert.Equal(t, 3, stats.Sessions)
+	assert.Equal(t, uint(1), stats.Subscribers)
+	assert.Equal(t, uint(3), stats.Sessions)
 
 	assert.Nil(t, customerChannel.Unsubscribe(s1))
 	assert.Nil(t, customerChannel.Unsubscribe(s2))
 	assert.Nil(t, customerChannel.Unsubscribe(s3))
 
 	stats = customerChannel.Stats()
-	assert.Equal(t, 0, stats.Subscribers)
-	assert.Equal(t, 0, stats.Sessions)
+	assert.Equal(t, uint(0), stats.Subscribers)
+	assert.Equal(t, uint(0), stats.Sessions)
 }
 
 func TestChannel_SubscribeMaxLimitSessions(t *testing.T) {
@@ -65,8 +65,8 @@ func TestChannel_Close(t *testing.T) {
 	assert.Nil(t, err)
 
 	stats := customerChannel.Stats()
-	assert.Equal(t, 3, stats.Subscribers)
-	assert.Equal(t, 3, stats.Sessions)
+	assert.Equal(t, uint(3), stats.Subscribers)
+	assert.Equal(t, uint(3), stats.Sessions)
 
 	assert.Nil(t, customerChannel.Close())
 	assert.True(t, s1.IsClosed())
@@ -74,13 +74,13 @@ func TestChannel_Close(t *testing.T) {
 	assert.True(t, s3.IsClosed())
 
 	stats = customerChannel.Stats()
-	assert.Equal(t, 0, stats.Subscribers)
-	assert.Equal(t, 0, stats.Sessions)
+	assert.Equal(t, uint(0), stats.Subscribers)
+	assert.Equal(t, uint(0), stats.Sessions)
 }
 
 func TestChannel_Listen(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
-	customerChannel := New()
+	customerChannel := New(SubscriptionBufSize(0))
 	var flagc int32
 	err := customerChannel.Listen(ctx, "mmadfox", func(b []byte) {
 		assert.Equal(t, "mmadfox", string(b))
@@ -90,9 +90,9 @@ func TestChannel_Listen(t *testing.T) {
 	})
 	assert.Nil(t, err)
 	assert.Nil(t, customerChannel.PublishToAllSubscribers([]byte("mmadfox")))
-	<-time.After(time.Second)
+	<-time.After(300 * time.Millisecond)
 	cancel()
-	<-time.After(time.Second)
+	<-time.After(300 * time.Millisecond)
 	assert.Equal(t, int32(2), atomic.LoadInt32(&flagc))
 }
 
@@ -114,8 +114,8 @@ func TestChannel_Subscribe(t *testing.T) {
 		}(subscription)
 	}
 	stats := customerChannel.Stats()
-	assert.Equal(t, subscribers, stats.Subscribers)
-	assert.Equal(t, subscribers, stats.Sessions)
+	assert.Equal(t, uint(subscribers), stats.Subscribers)
+	assert.Equal(t, uint(subscribers), stats.Sessions)
 	err := customerChannel.PublishToAllSubscribers([]byte("MSG"))
 	assert.Nil(t, err)
 	wg.Wait()
@@ -247,8 +247,8 @@ func TestChannel_Unsubscribe(t *testing.T) {
 	}
 
 	stats := customerChannel.Stats()
-	assert.Equal(t, count, stats.Subscribers)
-	assert.Equal(t, count, stats.Sessions)
+	assert.Equal(t, uint(count), stats.Subscribers)
+	assert.Equal(t, uint(count), stats.Sessions)
 
 	for _, s := range subscriptions {
 		assert.False(t, s.IsClosed())
@@ -258,15 +258,16 @@ func TestChannel_Unsubscribe(t *testing.T) {
 	}
 
 	stats = customerChannel.Stats()
-	assert.Equal(t, 0, stats.Subscribers)
-	assert.Equal(t, 0, stats.Sessions)
+	assert.Equal(t, uint(0), stats.Subscribers)
+	assert.Equal(t, uint(0), stats.Sessions)
 }
 
-func TestChannel_IgnoreSlowClients(t *testing.T) {
-	customerChannel := New(IgnoreSlowClients())
+func TestChannel_SkipSlowSubscribers(t *testing.T) {
+	customerChannel := New(SkipSlowSubscribers())
 	subscription, err := customerChannel.Subscribe("user")
 	assert.Nil(t, err)
 	go func() {
+		// blocking
 		<-subscription.Channel()
 	}()
 	for i := 0; i < 10; i++ {
@@ -275,7 +276,7 @@ func TestChannel_IgnoreSlowClients(t *testing.T) {
 }
 
 func BenchmarkChannel_Publish(b *testing.B) {
-	customerChannel := New(IgnoreSlowClients())
+	customerChannel := New(SkipSlowSubscribers())
 	finished := make(chan struct{}, b.N)
 	for i := 0; i < b.N; i++ {
 		n := fmt.Sprintf("n%d", i)

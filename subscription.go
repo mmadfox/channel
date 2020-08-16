@@ -64,6 +64,6 @@ func (s Subscription) String() string {
 }
 
 type Stats struct {
-	Subscribers int
-	Sessions    int
+	Subscribers uint
+	Sessions    uint
 }

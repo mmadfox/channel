@@ -15,7 +15,7 @@ type Channels struct {
 
 func NewChannels() *Channel {
      channels := Channels{
-          gpsLocationChanged: channel.New(channel.IgnoreSlowClient()),
+          gpsLocationChanged: channel.New(channel.SkipSlowSubscribers()),
 	  orderChanged: channel.New(channel.IgnoreSlowClient()),
 	  accountChanged: channel.New(channel.IgnoreSlowClient()),
      }
@@ -148,7 +148,7 @@ func (s *Subscriptions) GpsLocationChanged(ctx context.Context, input *models.GP
 // maximum sessions per subscriber.
 MaxLimitSessions(limit int) Option 
 // non-blocking message sending.
-IgnoreSlowClients() Option
+SkipSlowSubscribers() Option
 // subscriptions buffered channel size.
 SubscriptionBufSize(size int) Option 
 ```

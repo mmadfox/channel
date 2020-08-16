@@ -5,33 +5,29 @@ import (
 )
 
 type bucketOptions struct {
-	maxLimitSessions  int
-	ignoreSlowClients bool
-	bufSize           int
+	maxLimitSessions    int
+	skipSlowSubscribers bool
+	bufSize             int
 }
 
 type bucket struct {
 	sync.RWMutex
-	subscribers       map[string][]Subscription
-	queue             chan []byte
-	done              chan struct{}
-	sessionCount      int
-	subscribersCount  int
-	maxLimitSessions  int
-	ignoreSlowClients bool
-	bufSize           int
+	subscribers      map[string][]Subscription
+	queue            chan []byte
+	done             chan struct{}
+	sessionCount     uint
+	subscribersCount uint
+	options          *bucketOptions
 }
 
 func newBucket(
 	opt *bucketOptions,
 ) *bucket {
 	b := &bucket{
-		maxLimitSessions:  opt.maxLimitSessions,
-		subscribers:       make(map[string][]Subscription),
-		queue:             make(chan []byte, 1),
-		done:              make(chan struct{}),
-		ignoreSlowClients: opt.ignoreSlowClients,
-		bufSize:           opt.bufSize,
+		subscribers: make(map[string][]Subscription),
+		queue:       make(chan []byte, 1),
+		done:        make(chan struct{}),
+		options:     opt,
 	}
 	go b.listen()
 	return b
@@ -67,7 +63,7 @@ func (b *bucket) unsubscribe(subscriber string, session string) error {
 	} else {
 		b.subscribers[subscriber] = subscriptions
 	}
-	b.subscribersCount = len(b.subscribers)
+	b.subscribersCount = uint(len(b.subscribers))
 	if b.sessionCount > 0 {
 		b.sessionCount--
 	}
@@ -81,8 +77,11 @@ func (b *bucket) publishTo(subscriber string, payload []byte) error {
 	if !found {
 		return ErrSubscriberNotFound
 	}
-	for _, subscription := range subscriptions {
-		subscription.Publish(payload, b.ignoreSlowClients)
+	for i := len(subscriptions) - 1; i >= 0; i-- {
+		subscriptions[i].Publish(
+			payload,
+			b.options.skipSlowSubscribers,
+		)
 	}
 	return nil
 }
@@ -91,8 +90,11 @@ func (b *bucket) publish(payload []byte) {
 	b.RLock()
 	defer b.RUnlock()
 	for _, subscriptions := range b.subscribers {
-		for _, subscription := range subscriptions {
-			subscription.Publish(payload, b.ignoreSlowClients)
+		for i := len(subscriptions) - 1; i >= 0; i-- {
+			subscriptions[i].Publish(
+				payload,
+				b.options.skipSlowSubscribers,
+			)
 		}
 	}
 }
@@ -101,15 +103,16 @@ func (b *bucket) close() {
 	b.Lock()
 	defer b.Unlock()
 	for sid, subscriptions := range b.subscribers {
-		for _, subscription := range subscriptions {
-			if !subscription.IsClosed() {
-				subscription.Close()
+		for i := len(subscriptions) - 1; i >= 0; i-- {
+			if !subscriptions[i].IsClosed() {
+				subscriptions[i].Close()
 				b.sessionCount--
 			}
+
 		}
 		delete(b.subscribers, sid)
 	}
-	b.subscribersCount = len(b.subscribers)
+	b.subscribersCount = uint(len(b.subscribers))
 	close(b.done)
 }
 
@@ -120,13 +123,13 @@ func (b *bucket) subscribe(subscriber string) (Subscription, error) {
 	if !found {
 		subscriptions = make([]Subscription, 0, 1)
 	}
-	if len(subscriptions) >= b.maxLimitSessions {
+	if len(subscriptions) >= b.options.maxLimitSessions {
 		return Subscription{}, ErrTooManySessions
 	}
-	s := MakeSubscription(subscriber, b.bufSize)
+	s := MakeSubscription(subscriber, b.options.bufSize)
 	subscriptions = append(subscriptions, s)
 	b.subscribers[subscriber] = subscriptions
-	b.subscribersCount = len(b.subscribers)
+	b.subscribersCount = uint(len(b.subscribers))
 	b.sessionCount++
 	return s, nil
 }

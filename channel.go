@@ -19,9 +19,9 @@ func New(options ...Option) *Channel {
 		bucketSize: numCPU,
 		buckets:    make([]*bucket, numCPU),
 		bucketOpts: &bucketOptions{
-			maxLimitSessions:  DefaultMaxLimitSessions,
-			ignoreSlowClients: false,
-			bufSize:           DefaultBufSize,
+			maxLimitSessions:    DefaultMaxLimitSessions,
+			skipSlowSubscribers: false,
+			bufSize:             DefaultBufSize,
 		},
 	}
 	for _, opt := range options {
@@ -110,8 +110,8 @@ func (c *Channel) Unsubscribe(s Subscription) error {
 func (c *Channel) Stats() (s Stats) {
 	for _, bucket := range c.buckets {
 		bucket.RLock()
-		s.Sessions += bucket.sessionCount
-		s.Subscribers += bucket.subscribersCount
+		s.Sessions += uint(bucket.sessionCount)
+		s.Subscribers += uint(bucket.subscribersCount)
 		bucket.RUnlock()
 	}
 	return s

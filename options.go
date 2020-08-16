@@ -17,10 +17,10 @@ func MaxLimitSessions(limit int) Option {
 	}
 }
 
-// IgnoreSlowClients non-blocking message sending.
-func IgnoreSlowClients() Option {
+// SkipSlowSubscribers non-blocking message sending.
+func SkipSlowSubscribers() Option {
 	return func(c *bucketOptions) {
-		c.ignoreSlowClients = true
+		c.skipSlowSubscribers = true
 	}
 }
 
