@@ -1,5 +1,6 @@
 # channel
-Channels for subscriptions. Used in GQLgen API to forward messages from kafka broker to websocket clients.
+Channels for subscriptions. 
+Used in GQLgen(GrpaphQL) and gRPC to forward messages from kafka broker to websocket clients.
 
 ### Example
 
