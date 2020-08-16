@@ -13,6 +13,7 @@ var (
 	ErrSubscriberNotFound   = errors.New("channel: subscriber not found")
 )
 
+// New constructs a new Channel with the given Options.
 func New(options ...Option) *Channel {
 	numCPU := runtime.NumCPU()
 	channel := Channel{
@@ -33,12 +34,14 @@ func New(options ...Option) *Channel {
 	return &channel
 }
 
+// Channel represents a stream of data of one type.
 type Channel struct {
 	bucketSize int
 	buckets    []*bucket
 	bucketOpts *bucketOptions
 }
 
+// Close closes the channel.
 func (c *Channel) Close() error {
 	for _, bucket := range c.buckets {
 		bucket.close()
@@ -46,6 +49,7 @@ func (c *Channel) Close() error {
 	return nil
 }
 
+// PublishToSubscriber sends a message to the subscriber.
 func (c *Channel) PublishToSubscriber(subscriber string, message []byte) error {
 	bucket, err := c.bucket(subscriber)
 	if err != nil {
@@ -54,6 +58,7 @@ func (c *Channel) PublishToSubscriber(subscriber string, message []byte) error {
 	return bucket.publishTo(subscriber, message)
 }
 
+// PublishToSubscribers sends a message to the subscribers.
 func (c *Channel) PublishToSubscribers(subscribers []string, message []byte) error {
 	for _, subscriber := range subscribers {
 		bucket, err := c.bucket(subscriber)
@@ -71,6 +76,7 @@ func (c *Channel) PublishToSubscribers(subscribers []string, message []byte) err
 	return nil
 }
 
+// PublishToAllSubscribers sends a message to an all subscribers.
 func (c *Channel) PublishToAllSubscribers(message []byte) error {
 	for _, bucket := range c.buckets {
 		bucket.queue <- message
@@ -78,6 +84,7 @@ func (c *Channel) PublishToAllSubscribers(message []byte) error {
 	return nil
 }
 
+// Listen listens to the messages from the channel.
 func (c *Channel) Listen(ctx context.Context, subscriber string,
 	handle func(b []byte), cleanup func()) error {
 	subscription, err := c.Subscribe(subscriber)
@@ -99,6 +106,7 @@ func (c *Channel) Listen(ctx context.Context, subscriber string,
 	return nil
 }
 
+// Unsubscribe unsubscribes from the channel.
 func (c *Channel) Unsubscribe(s Subscription) error {
 	bucket, err := c.bucket(s.Subscriber())
 	if err != nil {
@@ -107,6 +115,7 @@ func (c *Channel) Unsubscribe(s Subscription) error {
 	return bucket.unsubscribe(s.Subscriber(), s.Session())
 }
 
+// Stats returns statistics for the channel.
 func (c *Channel) Stats() (s Stats) {
 	for _, bucket := range c.buckets {
 		bucket.RLock()
@@ -117,6 +126,7 @@ func (c *Channel) Stats() (s Stats) {
 	return s
 }
 
+// Subscribe subscribes to the channel.
 func (c *Channel) Subscribe(subscriber string) (Subscription, error) {
 	bucket, err := c.bucket(subscriber)
 	if err != nil {
